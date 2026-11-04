@@ -1,0 +1,5 @@
+sample_size,epsilon,query,mae,rmspe_pct,completed_runs,values_scored,relative_values_scored,zero_reference_values,zero_reference_bins
+1000,1.0,AVG,0.05893985730909268,1.522238482188883,3,3,3,0,0
+1000,1.0,COUNT,2.0,0.34641016151377546,3,3,3,0,0
+1000,1.0,HISTOGRAM,1.0,0.261951581079969,3,9,6,3,1
+1000,1.0,SUM,33.8569699847288,0.9002763775066696,3,3,3,0,0

@@ -1,0 +1,4 @@
+{
+  "caption": "AVG MAE",
+  "description": "Measured errors over repeated Tumult evaluations. Lower error is better; blank cells indicate undefined or unavailable metrics. Single-point charts show the measured value directly."
+}

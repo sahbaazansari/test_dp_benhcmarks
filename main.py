@@ -29,6 +29,9 @@ import json
 import math
 import os
 import re
+import sys
+import threading
+import traceback
 import webbrowser
 
 from decimal import Decimal
@@ -43,6 +46,64 @@ from dotenv import load_dotenv
 
 QUERIES = ("SUM", "AVG", "COUNT", "HISTOGRAM")
 GENDERS = ("M", "F", "OTHER")
+
+
+class TeeTextStream:
+    def __init__(self, terminal, log_file, lock):
+        self.terminal = terminal
+        self.log_file = log_file
+        self.lock = lock
+
+    def write(self, text):
+        with self.lock:
+            written = self.terminal.write(text)
+            self.log_file.write(text)
+            self.log_file.flush()
+            return written
+
+    def flush(self):
+        with self.lock:
+            self.terminal.flush()
+            self.log_file.flush()
+
+    def __getattr__(self, name):
+        return getattr(self.terminal, name)
+
+
+class TerminalOutputLog:
+    def __init__(self, path):
+        self.path = Path(path).expanduser()
+        self.lock = threading.Lock()
+
+    def __enter__(self):
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        self.log_file = self.path.open(
+            "a",
+            encoding="utf-8",
+        )
+        self.original_stdout = sys.stdout
+        self.original_stderr = sys.stderr
+        sys.stdout = TeeTextStream(
+            self.original_stdout,
+            self.log_file,
+            self.lock,
+        )
+        sys.stderr = TeeTextStream(
+            self.original_stderr,
+            self.log_file,
+            self.lock,
+        )
+        return self
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        try:
+            sys.stdout.flush()
+            sys.stderr.flush()
+        finally:
+            sys.stdout = self.original_stdout
+            sys.stderr = self.original_stderr
+            self.log_file.close()
+        return False
 
 
 # ============================================================
@@ -936,7 +997,28 @@ def run_benchmark(c):
 
 def main():
     args = arguments()
+    load_dotenv(args.env, override=False)
 
+    log_path = os.getenv("TERMINAL_LOG", "./logs/benchmark.log").strip()
+    logger = TerminalOutputLog(log_path) if log_path else None
+
+    if logger is None:
+        run(args)
+    else:
+        with logger:
+            try:
+                run(args)
+            except SystemExit as error:
+                if isinstance(error.code, str):
+                    print(error.code, file=sys.stderr)
+                    raise SystemExit(1)
+                raise
+            except Exception:
+                traceback.print_exc()
+                raise SystemExit(1)
+
+
+def run(args):
     if args.plot_only:
         finish_outputs(
             Path(args.plot_only),
